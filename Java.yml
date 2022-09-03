@@ -1,0 +1,11 @@
+
+- import_playbook: checkJava.yml
+
+- import_playbook: installjava.yml
+  when:
+    - java_dir_exist.stat.exists == False or
+      java_version.stdout is version(jdk_version, '<') or
+      java_version.stdout is version(jdk_version, '>')
+
+# - import_playbook: upgradejava.yml
+#   when: java_version.stdout is version(jdk_version, '<') and java_dir_exist.stat.exists

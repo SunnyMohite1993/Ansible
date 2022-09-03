@@ -1,0 +1,38 @@
+- name: This Play will Install Java
+  hosts: "{{hosts}}"
+  vars_files:
+    - variable.yaml
+  become: yes
+  tasks:
+    - name: clear old java files
+      shell: yum -y remove java
+      when: java_version.stdout is version(jdk_version, '>') or java_version.stdout is version(jdk_version, '<')
+      ignore_errors: true
+    - name: remove soft link
+      file:
+        path: "{{app_dir}}/java"
+        state: absent
+      when: java_version.stdout is version(jdk_version, '>') or java_version.stdout is version(jdk_version, '<')
+      ignore_errors: true
+
+
+    - name: "Install {{ java_rpm }}"
+      shell: " rpm -ivh --prefix={{ app_dir }} {{ java_rpm }} "
+
+    - name: Find rpm folder name
+      shell: rpm -qpi "{{ java_rpm }}" 2>&1 | grep Name | awk '{print $3}' | sed 's/"//g'
+      register: java_folder_name
+
+    - name: Create link
+      file:
+        src: "{{ app_dir }}/{{java_folder_name.stdout}}"
+        dest: "{{ app_dir }}/java"
+        state: link
+        owner: "{{ ansible_ssh_user }}"
+
+    - name: Set envirnoment variables
+      blockinfile:
+          path: /etc/profile
+          block: |
+            export JAVA_HOME={{app_dir}}/java
+            export PATH=$HOME/bin:$JAVA_HOME/bin:$PATH

@@ -1,0 +1,50 @@
+
+- name: Check Java Version
+  hosts: "{{hosts}}"
+  become: yes
+  vars_files:
+    - variable.yaml
+  tasks:
+#1 Check Java is installed
+    - name: Check Java Path exists
+      stat:
+        path: "{{ app_dir }}/java"
+      register: java_dir_exist
+      tags:
+        - t0
+
+    - name: Check if Java is Installed
+      shell: ./java -version 2>&1 | grep version | awk '{print $3}' | sed 's/"//g'
+      register: java_version
+      #ignore_errors: true
+      when: java_dir_exist.stat.exists
+      args:
+        chdir: "{{app_dir}}/java/bin/"
+      tags:
+        - t0
+
+    - debug:
+        msg: "Java is not Installed"
+      when: not java_dir_exist.stat.exists
+
+      ignore_errors: true
+    - debug:
+       msg: "Current Version:{{ java_version.stdout }} is equal to Required Version:{{ jdk_version }}. No changes needed"
+      when: java_version.stdout is version(jdk_version, '=') and java_dir_exist.stat.exists
+      ignore_errors: true
+    - debug:
+        msg: "{{ java_version.stdout }} is newer than {{ jdk_version }}. Downgrade is needed."
+      when: java_version.stdout is version(jdk_version, '>') and java_dir_exist.stat.exists
+      ignore_errors: true
+    - debug:
+        msg: "{{ java_version.stdout }} is older than {{ jdk_version }}. Upgrade is needed."
+      when: java_version.stdout is version(jdk_version, '<') and java_dir_exist.stat.exists
+      ignore_errors: true
+
+    # - set_fact:
+    #      java_version_result: "{{ jdk_version in java_version.stderr }}"
+    #   when: java_dir_exist.stat.exists
+    #   #  java_version_result: "{{'No such file or directory' in java_version}}"
+    # - debug:
+    #     msg: " Preferred Java-{{ jdk_version }} already exists: {{java_version_result}}"
+    #   when: java_dir_exist.stat.exists

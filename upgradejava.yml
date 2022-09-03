@@ -1,0 +1,14 @@
+- name: "This Play will upgrade Java {{jdk_version}}"
+  hosts: "{{hosts}}"
+  vars_files:
+    - variable.yaml
+  become: yes
+  tasks:
+    - name: clear old java files
+      shell: yum -y remove java
+    - name: remove soft link
+      file:
+        path: "{{app_dir}}/java"
+        state: absent
+
+- import_playbook : installjava.yml  
