@@ -4,8 +4,8 @@ app_dir: /nps/apps
 java_rpm: "{{ installfiles }}/java.rpm"
 jdk_version: 11.0.10
 
-tomcat_dir: "/nps/apps/tomcat-{{tomcat_port}}"
-tomcat_package: "{{ installfiles }}/apache-tomcat-9.0.62.tar.gz"
+tomcat_dir: "{{app_dir}}/tomcat{{tomcat_port}}"
+tomcat_rpm: "{{ installfiles }}/tomcat-9.0.62.rpm"
 needed_tomcat_version: 9.0.62
 tomcat_port: '28080'
 

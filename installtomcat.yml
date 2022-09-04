@@ -1,0 +1,22 @@
+- name: This Play will Install Tomcat
+  hosts: "{{hosts}}"
+  vars_files:
+    - variable.yaml
+  become: yes
+  tasks:
+      - name: "Install {{ tomcat_rpm }}"
+        shell: rpm -ivh --prefix={{ app_dir }} {{ tomcat_rpm }}
+
+      # - name: Find rpm folder name
+      #   shell: rpm -qpi "{{ tomcat_rpm }}" 2>&1 | grep Name | awk '{print $3}' | sed 's/"//g'
+      #   register: tomcat_folder_name
+
+      - name: Move install files to folder
+        shell: mv {{app_dir}}/apache-tomcat-{{needed_tomcat_version}} {{app_dir}}/apache-tomcat-{{needed_tomcat_version}}-{{tomcat_port}}
+
+      - name: Create link
+        file:
+          src: "{{ app_dir }}/apache-tomcat-{{needed_tomcat_version}}-{{tomcat_port}}"
+          dest: "{{ app_dir }}/tomcat{{tomcat_port}}"
+          state: link
+          owner: "{{ ansible_ssh_user }}"

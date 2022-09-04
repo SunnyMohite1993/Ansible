@@ -1,0 +1,36 @@
+- name: This play will check Tomcat
+  hosts: "{{hosts}}"
+  vars_files:
+    - variable.yaml
+  tasks:
+    - name: Check Tomcat dir exists
+      stat:
+        path: "{{ app_dir }}/tomcat{{tomcat_port}}"
+      register: tomcat_dir_exist
+
+    - name: Check Tomcat Version
+      shell: bash version.sh 2>&1 | grep version | awk '{print $3}' | sed 's/"//g'
+      register: tomcat_version
+      when: tomcat_dir_exist.stat.exists
+      args:
+        chdir: "{{app_dir}}/tomcat{{tomcat_port}}/bin"
+
+    - debug:
+        msg: "Tomcat is not Installed"
+      when: not tomcat_dir_exist.stat.exists
+      ignore_errors: true
+
+    - debug:
+        msg: "Current Version:{{ tomcat_version.stdout }} is equal to Required Version:{{ needed_tomcat_version }}. No changes needed"
+      when: tomcat_version.stdout is version(needed_tomcat_version, '=')
+      ignore_errors: true
+
+    - debug:
+        msg: "{{ tomcat_version.stdout }} is newer than {{ needed_tomcat_version }}. Downgrade is needed."
+      when: tomcat_version.stdout is version(needed_tomcat_version, '>')
+      ignore_errors: true
+      
+    - debug:
+        msg: "{{ tomcat_version.stdout }} is older than {{ needed_tomcat_version }}. Upgrade is needed."
+      when: tomcat_version.stdout is version(needed_tomcat_version, '<')
+      ignore_errors: true
