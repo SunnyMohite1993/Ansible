@@ -4,19 +4,126 @@
     - variable.yaml
   become: yes
   tasks:
+
       - name: "Install {{ tomcat_rpm }}"
         shell: rpm -ivh --prefix={{ app_dir }} {{ tomcat_rpm }}
+        ignore_errors: true
+
 
       # - name: Find rpm folder name
       #   shell: rpm -qpi "{{ tomcat_rpm }}" 2>&1 | grep Name | awk '{print $3}' | sed 's/"//g'
       #   register: tomcat_folder_name
 
+      # - name: copy install files to custom folder
+      #   copy:
+      #     src: "{{app_dir}}/apache-tomcat-{{needed_tomcat_version}}"
+      #     dest: "{{tomcat_install_path}}"
+      #     mode: 0755
+
       - name: Move install files to folder
-        shell: mv {{app_dir}}/apache-tomcat-{{needed_tomcat_version}} {{app_dir}}/apache-tomcat-{{needed_tomcat_version}}-{{tomcat_port}}
+        shell: sudo mkdir -p {{tomcat_install_path}} && cp -avr {{app_dir}}/apache-tomcat-{{needed_tomcat_version}}/* {{tomcat_install_path}}
 
       - name: Create link
         file:
-          src: "{{ app_dir }}/apache-tomcat-{{needed_tomcat_version}}-{{tomcat_port}}"
-          dest: "{{ app_dir }}/tomcat{{tomcat_port}}"
+          src: "{{tomcat_install_path}}"
+          dest: "{{ tomcat_dir }}"
           state: link
           owner: "{{ ansible_ssh_user }}"
+
+      - name: Create the service
+        command: touch /usr/lib/systemd/system/tomcat{{tomcat_port}}.service
+
+      - name: edit the service
+        blockinfile:
+          path: /usr/lib/systemd/system/tomcat{{tomcat_port}}.service
+          block: |
+            [Unit]
+            Description=Apache Tomcat Web Application Container
+            After=syslog.target network.target
+
+            [Service]
+            Type=forking
+
+            WorkingDirectory={{tomcat_dir}}/bin/
+            ExecStart={{tomcat_dir}}/bin/startup.sh
+            ExecStop={{tomcat_dir}}/bin/shutdown.sh
+
+            User={{ansible_ssh_user}}
+            Group={{ansible_ssh_user}}
+            UMask=0007
+            RestartSec=10
+            Restart=always
+
+            [Install]
+            WantedBy=multi-user.target
+
+      - name: remove old Env file
+        file:
+          path: "{{tomcat_dir}}/bin/setenv.sh"
+          state: absent
+      - name: create env File
+        file:
+          path: "{{tomcat_dir}}/bin/setenv.sh"
+          state: touch
+          mode: 0755
+
+      - name: set env
+        blockinfile:
+          path:  "{{tomcat_dir}}/bin/setenv.sh"
+          block: |
+            export JAVA_HOME={{app_dir}}/java
+            export CATALINA_HOME={{tomcat_dir}}
+            export CATALINA_BASE={{tomcat_dir}}
+            export CATALINA_PID={{tomcat_dir}}/temp/tomcat.pid
+            export JAVA_OPTS="$JAVA_OPTS -Xms500M"
+            export JAVA_OPTS="$JAVA_OPTS -Xmx1000M"
+            export JAVA_OPTS="$JAVA_OPTS -Djava.awt.headless=true"
+            export JAVA_OPTS="$JAVA_OPTS -Duser.timezone=GMT"
+            export JAVA_OPTS="$JAVA_OPTS -Duser.displayTimezone=Europe/London"
+
+      - name: update Tomcat user roles.
+        blockinfile:
+          path: "{{tomcat_dir}}/conf/tomcat-users.xml"
+          insertbefore: </tomcat-users>
+          block: |
+           <role rolename="tomcat"/>
+           <role rolename="role1"/>
+           <role rolename="manager-gui"/>
+           <user username="{{ansible_ssh_user}}" password="{{ansible_ssh_pass}}" roles="tomcat,role1,manager-gui"/>
+
+      - name: Change ownership
+        command: "{{item}} {{tomcat_install_path}}"
+        with_items:
+          - chown -R {{ansible_ssh_user}}:{{ansible_ssh_user}}
+          - chmod -R 755
+
+      - name: Change Port
+        replace:
+          path: "{{tomcat_dir}}/conf/server.xml"
+          regexp: "{{ item.reexp1 }}"
+          replace: "{{ item.replace }}"
+          backup: yes
+        with_items:
+          - { reexp1: '8005', replace: '{{tomcat_shutdown_port }}'}
+          - { reexp1: '8080', replace: '{{tomcat_port}}'}
+        tags:
+          - t9
+      - name: Copy war file
+        copy:
+          src: "{{installfiles}}/sample.war"
+          dest: "{{tomcat_dir}}/webapps"
+          owner: "{{ansible_ssh_user}}"
+          mode: 0755
+
+      - name: Start Service
+        command: "{{item}}"
+        with_items:
+          - systemctl daemon-reload
+          - systemctl start tomcat{{tomcat_port}}
+          - systemctl status tomcat{{tomcat_port}}
+
+      - name: "check the status tomcat"
+        uri:
+         url: "http://localhost:{{tomcat_port}}"
+        tags:
+          - t10

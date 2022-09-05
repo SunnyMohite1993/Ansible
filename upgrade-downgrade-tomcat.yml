@@ -1,0 +1,43 @@
+- name: Upgrade/Downgrade tomcat
+  hosts: "{{hosts}}"
+  vars_files:
+    - variable.yaml
+  become: yes
+  tasks:
+
+      - file:
+          path:  "{{backup_dir}}/tomcat-{{tomcat_port}}"
+          state: directory
+          owner: "{{ansible_ssh_user}}"
+
+      - name: Backup Warfiles
+        copy:
+          src: "{{tomcat_dir}}/webapps"
+          dest: "{{backup_dir}}/tomcat-{{tomcat_port}}"
+          mode: 0755
+
+      - service:
+          name: "tomcat{{tomcat_port}}"
+          state: stopped
+
+      - name: clear old tomcat
+        shell: yum -y remove nps*
+        when: tomcat_version.stdout is version(compare_tomcat_version, '>') or tomcat_version.stdout is version(compare_tomcat_version, '<')
+        ignore_errors: true
+
+      - name: release port
+        command: fuser -k {{tomcat_port}}/tcp
+        ignore_errors: true
+
+      - name: remove old files
+        file:
+         path: "{{item}}"
+         state: absent
+        with_items:
+          - "{{tomcat_dir}}"
+          - "{{app_dir}}/apache-tomcat-{{old_tomcat_version}}-{{tomcat_port}}"
+          - "/usr/lib/systemd/system/tomcat{{tomcat_port}}"
+        when: tomcat_version.stdout is version(compare_tomcat_version, '>') or tomcat_version.stdout is version(compare_tomcat_version, '<')
+        ignore_errors: true
+
+- import_playbook: installtomcat.yml
