@@ -4,6 +4,43 @@
     - variable.yaml
   become: yes
   tasks:
+      - name: Backup old Tomcat-{{old_tomcat_version}}
+        command: "{{item}}"
+        with_items:
+          - tar -czvf {{app_dir}}/apache-tomcat-{{old_tomcat_version}}-{{tomcat_port}}.tar.gz {{app_dir}}/apache-tomcat-{{old_tomcat_version}}-{{tomcat_port}}
+          - tar -xzvf {{app_dir}}/apache-tomcat-{{old_tomcat_version}}-{{tomcat_port}}.tar.gz -C {{backup_dir}} --strip-components=2
+          - rm -f {{app_dir}}/apache-tomcat-{{old_tomcat_version}}-{{tomcat_port}}.tar.gz
+          - chown -R {{ansible_ssh_user}}:{{ansible_ssh_user}} {{backup_dir}}
+        when: tomcat_version.stdout is version(compare_tomcat_version, '>') or tomcat_version.stdout is version(compare_tomcat_version, '<')
+        tags:
+          - backup
+
+      - service:
+          name: "tomcat{{tomcat_port}}"
+          state: stopped
+        when: tomcat_version.stdout is version(compare_tomcat_version, '>') or tomcat_version.stdout is version(compare_tomcat_version, '<')
+        ignore_errors: true
+      - name: clear old tomcat
+        shell: yum -y remove nps*
+        when: tomcat_version.stdout is version(compare_tomcat_version, '>') or tomcat_version.stdout is version(compare_tomcat_version, '<')
+        ignore_errors: true
+
+
+      - name: release port
+        command: fuser -k {{tomcat_port}}/tcp
+        ignore_errors: true
+        when: tomcat_version.stdout is version(compare_tomcat_version, '>') or tomcat_version.stdout is version(compare_tomcat_version, '<')
+
+      - name: remove old files
+        file:
+         path: "{{item}}"
+         state: absent
+        with_items:
+          - "{{tomcat_dir}}"
+          - "{{app_dir}}/apache-tomcat-{{old_tomcat_version}}-{{tomcat_port}}"
+          - "/usr/lib/systemd/system/tomcat{{tomcat_port}}"
+        when: tomcat_version.stdout is version(compare_tomcat_version, '>') or tomcat_version.stdout is version(compare_tomcat_version, '<')
+        ignore_errors: true
 
       - name: "Install {{ tomcat_rpm }}"
         shell: rpm -ivh --prefix={{ app_dir }} {{ tomcat_rpm }}
@@ -120,9 +157,10 @@
         with_items:
           - systemctl daemon-reload
           - systemctl start tomcat{{tomcat_port}}
+          - systemctl enable tomcat{{tomcat_port}}
           - systemctl status tomcat{{tomcat_port}}
 
-      - name: "check the status tomcat"
+      - name: "check the status of tomcat"
         uri:
          url: "http://localhost:{{tomcat_port}}"
         tags:

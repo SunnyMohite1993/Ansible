@@ -8,9 +8,9 @@ tomcat_dir: "{{app_dir}}/tomcat-{{tomcat_port}}"
 tomcat_rpm: "{{ installfiles }}/tomcat-9.0.62.rpm"
 tomcat_install_path: "{{app_dir}}/apache-tomcat-{{needed_tomcat_version}}-{{tomcat_port}}"
 compare_tomcat_version: 9.0.62.0
-old_tomcat_version: 9.0.54
 needed_tomcat_version: 9.0.62
-tomcat_port: '28080'
+old_tomcat_version: 9.0.54
+tomcat_port: '18080'
 tomcat_shutdown_port: "{{ (tomcat_port | int) - 10 }}"
 
 backup_dir: /nps/backup

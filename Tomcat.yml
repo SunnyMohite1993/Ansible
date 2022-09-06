@@ -3,11 +3,12 @@
 
 - import_playbook: installtomcat.yml
   when:
-    - tomcat_dir_exist.stat.exists == False
-
-
-- import_playbook: upgrade-downgrade-tomcat.yml
-  when:
-    - tomcat_version.stdout is version(compare_tomcat_version, '<') or
+    - tomcat_dir_exist.stat.exists == False or
+      tomcat_version.stdout is version(compare_tomcat_version, '<') or
       tomcat_version.stdout is version(compare_tomcat_version, '>')
-  ignore_errors: true
+
+# - import_playbook: upgrade-downgrade-tomcat.yml
+#   when:
+#     - tomcat_version.stdout is version(compare_tomcat_version, '<') or
+#       tomcat_version.stdout is version(compare_tomcat_version, '>')
+#   ignore_errors: true
